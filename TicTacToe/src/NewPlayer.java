@@ -4,32 +4,42 @@ import de.ovgu.dke.teaching.ml.tictactoe.api.IPlayer;
 import de.ovgu.dke.teaching.ml.tictactoe.api.IllegalMoveException;
 import de.ovgu.dke.teaching.ml.tictactoe.game.Move;
 
-import java.io.ObjectInputStream.GetField;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Some comments ...
  * 
  * @author Tilman Krokotsch, 199917
+ * @author Tim Sabsch, 200088
+ * 
+ * We use the following features:
+ * x0 = Single markers in a line of our player
+ * x1 = 2 marker in a line of our player
+ * x2 = 3 marker in a line of our player
+ * x3 = 4 marker in a line of our player
+ * x4 = Single marker in a line of the enemy player
+ * x5 = 2 marker in a line of the enemy player
+ * x6 = 3 marker in a line of the enemy player
+ * x7 = 4 marker in a line of the enemy player
  */
 public class NewPlayer implements IPlayer {
 
-	private double[] weights = {0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1};
+	private static final double ETA = 0.01;
+	private double[] weights = {0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1};
+	private final int FEATURE_NUMBER = weights.length;
 	private boolean learning = true;
 
 	public String getName() {
-		// TODO Auto-generated method stub
-		return "test";
+		return "EXTERMINATE!";
 	}
 
 	public int[] makeMove(IBoard board) {
-		// TODO Auto-generated method stub
 
 		// create a clone of the board that can be modified
 		IBoard copy = board.clone();
 
 		int[] movePos = decideBestMove(copy);
-		System.out.println(Arrays.toString(movePos));
 		// do a move using the cloned board
 		try {
 			copy.makeMove(new Move(this, movePos));
@@ -43,7 +53,7 @@ public class NewPlayer implements IPlayer {
 
 	public void onMatchEnds(IBoard board) {
 		if (learning) {
-
+			updateWeights(board);
 		} else {
 
 		}
@@ -55,14 +65,15 @@ public class NewPlayer implements IPlayer {
 	// //////////////////////////////////////////////////////////////////////////////////////////
 
 	private int[] decideBestMove(IBoard board) {
-		int dim = board.getSize();
+		int dimSize = board.getSize();
 		double maxValue = -100;
 		int[] bestMove = null;
 
-		for (int x = 0; x < dim; x++) {
-			for (int y = 0; y < dim; y++) {
-				for (int z = 0; z < dim; z++) {
+		for (int x = 0; x < dimSize; x++) {
+			for (int y = 0; y < dimSize; y++) {
+				for (int z = 0; z < dimSize; z++) {
 
+					//if field is already used, we cant set a marker on it
 					if (board.getFieldValue(new int[] { x, y, z }) != null)
 						break;
 
@@ -75,34 +86,31 @@ public class NewPlayer implements IPlayer {
 				}
 			}
 		}
-
 		return bestMove;
 	}
 
 
 	private double computeValueAtPosition (IBoard _board, int x, int y, int z) {
-		
+
 		IBoard board = _board.clone();
-		
+
 		int[] currentFeatures = getFeatures(board);
-		
 		double currentSum = 0;
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < FEATURE_NUMBER; i++) {
 			currentSum += currentFeatures[i] * weights[i];
 		}
 
 		try {
 			board.makeMove(new Move(this, new int[] {x,y,z}));
 		} catch(IllegalMoveException e) {}
-		
+
 		int[] futureFeatures = getFeatures(board);
-		
 		double futureSum = 0;
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < FEATURE_NUMBER; i++) {
 			futureSum += futureFeatures[i] * weights[i];
 		}
-		
-		if (x == 2 && y == 2 && z == 2) System.out.println();
+		System.out.println("cur " + Arrays.toString(currentFeatures));
+		System.out.println("fut " + Arrays.toString(futureFeatures));
 		return futureSum - currentSum;		
 	}
 
@@ -115,9 +123,9 @@ public class NewPlayer implements IPlayer {
 		int[] diagZLines = checkDiagZ(board);
 		int[] diag3DLines = check3D(board);
 
-		int[] features = new int[10];
-		
-		for (int i = 0; i < 10; i++) {
+		int[] features = new int[FEATURE_NUMBER];
+
+		for (int i = 0; i < FEATURE_NUMBER; i++) {
 			features[i] += xLines[i] + yLines[i] + zLines[i] + diagXLines[i]
 					+ diagYLines[i] + diagZLines[i] + diag3DLines[i];
 		}
@@ -125,416 +133,390 @@ public class NewPlayer implements IPlayer {
 	}
 
 	private int[] checkX(IBoard board) {
-		int[] result = new int[10];
-		int dim = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
+		int dimSize = board.getSize();
 		// Traverse board in horizontal x direction
-		for (int z = 0; z < dim; z++) {
-			for (int y = 0; y < dim; y++) {
+		for (int z = 0; z < dimSize; z++) {
+			for (int y = 0; y < dimSize; y++) {
 				IPlayer player = null;
 				int count = 0;
 
-				for (int x = 0; x < dim; x++) {
+				for (int x = 0; x < dimSize; x++) {
 
 					// Get player occupying field
-					IPlayer occupier = board
-							.getFieldValue(new int[] { x, y, z });
-					// When it is the first field the row the player to count is
-					// set.
-					// It does not matter which player is counted, as the row is
-					// not valid i two players occupy fields there.
-					if (occupier != null) {
-						if (player == null) {
-							player = occupier;
-							count++;
-						} else {
-							if (player != occupier) {
-								count = 0;
-								break;
-							} else {
-								count++;
-							}
-						}
-					}
+					IPlayer occupier = board.getFieldValue(new int[] { x, y, z });
+
+					//check the occupier
+					try {
+						player = checkFieldOccupier(occupier, player);
+						count++;
+					} catch (InvalidLineException e) {
+						count = 0;
+						break;
+					} catch (NotOccupiedException e) {}
 
 				}
-
-				if (count != 0) {
-					if (player == this)
-						result[count - 1]++;
-					else
-						result[count + 4]++;
-				}
+				// update the result
+				result = updateFeatureResult(player, result, count);
 			}
 		}
 		return result;
 	}
 
 	private int[] checkY(IBoard board) {
-		int[] result = new int[10];
-		int dim = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
+		int dimSize = board.getSize();
 
 		// Traverse board in horizontal y direction
-		for (int x = 0; x < dim; x++) {
-			for (int z = 0; z < dim; z++) {
+		for (int x = 0; x < dimSize; x++) {
+			for (int z = 0; z < dimSize; z++) {
 				IPlayer player = null;
 				int count = 0;
 
-				for (int y = 0; y < dim; y++) {
+				for (int y = 0; y < dimSize; y++) {
 
 					// Get player occupying field
 					IPlayer occupier = board
 							.getFieldValue(new int[] { x, y, z });
-					// When it is the first field the row the player to count is
-					// set.
-					// It does not matter which player is counted, as the row is
-					// not valid i two players occupy fields there.
-					if (occupier != null) {
-						if (player == null) {
-							player = occupier;
-							count++;
-						} else {
-							if (player != occupier) {
-								count = 0;
-								break;
-							} else {
-								count++;
-							}
-						}
-					}
+					
+					try {
+						player = checkFieldOccupier(occupier, player);
+						count++;
+					} catch (InvalidLineException e) {
+						count = 0;
+						break;
+					} catch (NotOccupiedException e) {}
 
 				}
 
-				if (count != 0) {
-					if (player == this)
-						result[count - 1]++;
-					else
-						result[count + 4]++;
-				}
+				result = updateFeatureResult(player, result, count);
 			}
 		}
+
 		return result;
 	}
 
 	private int[] checkZ(IBoard board) {
-		int[] result = new int[10];
-		int dim = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
+		int dimSize = board.getSize();
 
 		// Traverse board in horizontal z direction
-		for (int x = 0; x < dim; x++) {
-			for (int y = 0; y < dim; y++) {
+		for (int x = 0; x < dimSize; x++) {
+			for (int y = 0; y < dimSize; y++) {
 				IPlayer player = null;
 				int count = 0;
 
-				for (int z = 0; z < dim; z++) {
+				for (int z = 0; z < dimSize; z++) {
 
 					// Get player occupying field
 					IPlayer occupier = board
 							.getFieldValue(new int[] { x, y, z });
-					// When it is the first field the row the player to count is
-					// set.
-					// It does not matter which player is counted, as the row is
-					// not valid i two players occupy fields there.
-					if (occupier != null) {
-						if (player == null) {
-							player = occupier;
-							count++;
-						} else {
-							if (player != occupier) {
-								count = 0;
-								break;
-							} else {
-								count++;
-							}
-						}
-					}
+					
+					try {
+						player = checkFieldOccupier(occupier, player);
+						count++;
+					} catch (InvalidLineException e) {
+						count = 0;
+						break;
+					} catch (NotOccupiedException e) {}
 
 				}
 
-				if (count != 0) {
-					if (player == this)
-						result[count - 1]++;
-					else
-						result[count + 4]++;
-				}
+				result = updateFeatureResult(player, result, count);
 			}
 		}
 		return result;
 	}
 
 	private int[] checkDiagX(IBoard board) {
-		int[] result = new int[10];
-		int dim = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
+		int dimSize = board.getSize();
 
-		// Traverse board in diagonal z direction
-		for (int y = 0; y < dim; y++) {
-			IPlayer player = null;
-			int count = 0;
+		// Traverse board in diagonal x direction
+		for (int y = 0; y < dimSize; y++) {
+			IPlayer player_1 = null;
+			IPlayer player_2 = null;
+			int count_1 = 0;
+			int count_2 = 0;
+			boolean isBlocked_1 = false;
+			boolean isBlocked_2 = false;
 
-			for (int x = 0; x < dim; x++) {
+			for (int x = 0; x < dimSize; x++) {
 
-				// Get player occupying field
-				IPlayer occupier = board.getFieldValue(new int[] { x, y, x });
-				// When it is the first field the row the player to count is
-				// set.
-				// It does not matter which player is counted, as the row is not
-				// valid i two players occupy fields there.
-				if (occupier != null) {
-					if (player == null) {
-						player = occupier;
-						count++;
-					} else {
-						if (player != occupier) {
-							count = 0;
-							break;
-						} else {
-							count++;
-						}
-					}
+				/*
+				 * check both diagonal options:
+				 * 
+				 * x o o    o o x
+				 * o x o    o x o
+				 * o o x    x o o
+				 */
+				
+				if (!isBlocked_1){
+					IPlayer occupier_1 = board.getFieldValue(new int[] { x, y, x });
+					try {
+						player_1 = checkFieldOccupier(occupier_1, player_1);
+						count_1++;
+					} catch (InvalidLineException e) {
+						count_1 = 0;
+						isBlocked_1 = true;
+					} catch (NotOccupiedException e) {}
 				}
-
+				
+				if (!isBlocked_2){
+					IPlayer occupier_2 = board.getFieldValue(new int[] {x, y, (dimSize-1)-x});
+					try {
+						player_2 = checkFieldOccupier(occupier_2, player_2);
+						count_2++;
+					} catch (InvalidLineException e) {
+						count_2 = 0;
+						isBlocked_2 = true;
+					} catch (NotOccupiedException e) {}
+				}
+				
 			}
 
-			if (count != 0) {
-				if (player == this)
-					result[count - 1]++;
-				else
-					result[count + 4]++;
-			}
+			result = updateFeatureResult(player_1, result, count_1);
+			result = updateFeatureResult(player_2, result, count_2);
 		}
 		return result;
 	}
 
 	private int[] checkDiagY(IBoard board) {
-		int[] result = new int[10];
-		int dim = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
+		int dimSize = board.getSize();
 
-		// Traverse board in diagonal z direction
-		for (int z = 0; z < dim; z++) {
-			IPlayer player = null;
-			int count = 0;
+		// Traverse board in diagonal y direction
+		for (int z = 0; z < dimSize; z++) {
+			IPlayer player_1 = null;
+			IPlayer player_2 = null;
+			int count_1 = 0;
+			int count_2 = 0;
+			boolean isBlocked_1 = false;
+			boolean isBlocked_2 = false;
 
-			for (int y = 0; y < dim; y++) {
-
-				// Get player occupying field
-				IPlayer occupier = board.getFieldValue(new int[] { y, y, z });
-				// When it is the first field the row the player to count is
-				// set.
-				// It does not matter which player is counted, as the row is not
-				// valid i two players occupy fields there.
-				if (occupier != null) {
-					if (player == null) {
-						player = occupier;
-						count++;
-					} else {
-						if (player != occupier) {
-							count = 0;
-							break;
-						} else {
-							count++;
-						}
-					}
+			for (int y = 0; y < dimSize; y++) {
+				
+				if (!isBlocked_1){
+					IPlayer occupier_1 = board.getFieldValue(new int[] { y, y, z });
+					try {
+						player_1 = checkFieldOccupier(occupier_1, player_1);
+						count_1++;
+					} catch (InvalidLineException e) {
+						count_1 = 0;
+						isBlocked_1 = true;
+					} catch (NotOccupiedException e) {}
 				}
-
+				
+				if (!isBlocked_2){
+					IPlayer occupier_2 = board.getFieldValue(new int[] {y, (dimSize-1)-y, z});
+					try {
+						player_2 = checkFieldOccupier(occupier_2, player_2);
+						count_2++;
+					} catch (InvalidLineException e) {
+						count_2 = 0;
+						isBlocked_2 = true;
+					} catch (NotOccupiedException e) {}
+				}
+				
 			}
 
-			if (count != 0) {
-				if (player == this)
-					result[count - 1]++;
-				else
-					result[count + 4]++;
-			}
+			result = updateFeatureResult(player_1, result, count_1);
+			result = updateFeatureResult(player_2, result, count_2);
 		}
 		return result;
 	}
 
 	private int[] checkDiagZ(IBoard board) {
-		int[] result = new int[10];
-		int dim = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
+		int dimSize = board.getSize();
 
 		// Traverse board in diagonal z direction
-		for (int x = 0; x < dim; x++) {
-			IPlayer player = null;
-			int count = 0;
+		for (int x = 0; x < dimSize; x++) {
+			IPlayer player_1 = null;
+			IPlayer player_2 = null;
+			int count_1 = 0;
+			int count_2 = 0;
+			boolean isBlocked_1 = false;
+			boolean isBlocked_2 = false;
 
-			for (int z = 0; z < dim; z++) {
-
-				// Get player occupying field
-				IPlayer occupier = board.getFieldValue(new int[] { x, z, z });
-				// When it is the first field the row the player to count is
-				// set.
-				// It does not matter which player is counted, as the row is not
-				// valid i two players occupy fields there.
-				if (occupier != null) {
-					if (player == null) {
-						player = occupier;
-						count++;
-					} else {
-						if (player != occupier) {
-							count = 0;
-							break;
-						} else {
-							count++;
-						}
-					}
+			for (int z = 0; z < dimSize; z++) {
+				
+				if (!isBlocked_1){
+					IPlayer occupier_1 = board.getFieldValue(new int[] { x, z, z });
+					try {
+						player_1 = checkFieldOccupier(occupier_1, player_1);
+						count_1++;
+					} catch (InvalidLineException e) {
+						count_1 = 0;
+						isBlocked_1 = true;
+					} catch (NotOccupiedException e) {}
 				}
-
+				
+				if (!isBlocked_2){
+					IPlayer occupier_2 = board.getFieldValue(new int[] {x, (dimSize-1)-z, z});
+					try {
+						player_2 = checkFieldOccupier(occupier_2, player_2);
+						count_2++;
+					} catch (InvalidLineException e) {
+						count_2 = 0;
+						isBlocked_2 = true;
+					} catch (NotOccupiedException e) {}
+				}
+				
 			}
 
-			if (count != 0) {
-				if (player == this)
-					result[count - 1]++;
-				else
-					result[count + 4]++;
-			}
+			result = updateFeatureResult(player_1, result, count_1);
+			result = updateFeatureResult(player_2, result, count_2);
 		}
 		return result;
 	}
-	
+
 	private int[] check3D(IBoard board) {
 		int[] result0 = check3D_0(board);
 		int[] result1 = check3D_1(board);
 		int[] result2 = check3D_2(board);
 		int[] result3 = check3D_3(board);
-		
-		int[] result = new int[10];
-		
-		for (int i = 0; i < 10; i++)
+
+		int[] result = new int[FEATURE_NUMBER];
+
+		for (int i = 0; i < FEATURE_NUMBER; i++)
 			result[i] = result0[i] + result1[i] + result2[i] + result3[i];
-		
+
 		return result;
 	}
 
 	private int[] check3D_0(IBoard board) {
 		IPlayer player = null;
 		int count = 0;
-		int[] result = new int[10];
-		
-		for(int i = 0; i < 5; i++){
+		int dimSize = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
+
+		for(int i = 0; i < dimSize; i++){
 
 			IPlayer occupier = board.getFieldValue(new int[] { i, i, i });
 
-			if (occupier != null) {
-				if (player == null) {
-					player = occupier;
-					count++;
-				} else {
-					if (player != occupier) {
-						count = 0;
-						break;
-					} else {
-						count++;
-					}
-				}
-			}
+			try {
+				player = checkFieldOccupier(occupier, player);
+				count++;
+			} catch (InvalidLineException e) {
+				count = 0;
+				break;
+			} catch (NotOccupiedException e) {}
 		}
-		if (count != 0) {
-			if (player == this)
-				result[count - 1]++;
-			else
-				result[count + 4]++;
-		}
+		result = updateFeatureResult(player, result, count);
 		return result;
 	}
 	private int[] check3D_1(IBoard board) {
 		IPlayer player = null;
 		int count = 0;
-		int[] result = new int[10];
-		
-		for(int i = 0; i < 5; i++){
+		int dimSize = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
 
-			IPlayer occupier = board.getFieldValue(new int[] { 4-i, i, i });
+		for(int i = 0; i < dimSize; i++){
 
-			if (occupier != null) {
-				if (player == null) {
-					player = occupier;
-					count++;
-				} else {
-					if (player != occupier) {
-						count = 0;
-						break;
-					} else {
-						count++;
-					}
-				}
-			}
+			IPlayer occupier = board.getFieldValue(new int[] {(dimSize-1)-i, i, i });
+
+			try {
+				player = checkFieldOccupier(occupier, player);
+				count++;
+			} catch (InvalidLineException e) {
+				count = 0;
+				break;
+			} catch (NotOccupiedException e) {}
 		}
-		if (count != 0) {
-			if (player == this)
-				result[count - 1]++;
-			else
-				result[count + 4]++;
-		}
+		result = updateFeatureResult(player, result, count);
 		return result;
 	}
 	private int[] check3D_2(IBoard board) {
 		IPlayer player = null;
 		int count = 0;
-		int[] result = new int[10];
-		
-		for(int i = 0; i < 5; i++){
+		int dimSize = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
 
-			IPlayer occupier = board.getFieldValue(new int[] { i, 4-i, i });
+		for(int i = 0; i < dimSize; i++){
 
-			if (occupier != null) {
-				if (player == null) {
-					player = occupier;
-					count++;
-				} else {
-					if (player != occupier) {
-						count = 0;
-						break;
-					} else {
-						count++;
-					}
-				}
-			}
+			IPlayer occupier = board.getFieldValue(new int[] { i,(dimSize-1)-i, i });
+
+			try {
+				player = checkFieldOccupier(occupier, player);
+				count++;
+			} catch (InvalidLineException e) {
+				count = 0;
+				break;
+			} catch (NotOccupiedException e) {}
 		}
-		if (count != 0) {
-			if (player == this)
-				result[count - 1]++;
-			else
-				result[count + 4]++;
-		}
+		result = updateFeatureResult(player, result, count);
 		return result;
 	}
 	private int[] check3D_3(IBoard board) {
 		IPlayer player = null;
 		int count = 0;
-		int[] result = new int[10];
-		
-		for(int i = 0; i < 5; i++){
+		int dimSize = board.getSize();
+		int[] result = new int[FEATURE_NUMBER];
 
-			IPlayer occupier = board.getFieldValue(new int[] { i, i, 4-i });
+		for(int i = 0; i < dimSize; i++){
 
-			if (occupier != null) {
-				if (player == null) {
-					player = occupier;
-					count++;
-				} else {
-					if (player != occupier) {
-						count = 0;
-						break;
-					} else {
-						count++;
-					}
-				}
-			}
+			IPlayer occupier = board.getFieldValue(new int[] { i, i,(dimSize-1)-i });
+
+			try {
+				player = checkFieldOccupier(occupier, player);
+				count++;
+			} catch (InvalidLineException e) {
+				count = 0;
+				break;
+			} catch (NotOccupiedException e) {}
 		}
-		if (count != 0) {
-			if (player == this)
-				result[count - 1]++;
-			else
-				result[count + 4]++;
-		}
+		result = updateFeatureResult(player, result, count);
 		return result;
 	}
 
-	private boolean initWeights() {
-		for (int i = 0; i < 10; i++) {
-			weights[i] = 0;
-		}
+	private void updateWeights(IBoard board) {
 
-		return true;
+		List<IMove> history = board.getMoveHistory();
+		for (IMove move : history) {
+			System.out.println(move.getPlayer() + "  " + move.getPosition());
+			//TODO
+		}
+		for (int i = 0; i < weights.length; i++){
+			//weights[i] = weights[i] + eta * x * error;
+		}
 	}
 
+	private int[] updateFeatureResult(IPlayer player, int[] result, int count) {
+
+		if (count != 0) {
+			if (player == null){
+				result[count - 1]++;
+				result[count + (FEATURE_NUMBER/2-1)]++;
+			}
+			else if (player == this)
+				result[count - 1]++;
+			else{
+				result[count + (FEATURE_NUMBER/2-1)]++;
+			}
+		}
+		return result;
+	}
+	
+	private IPlayer checkFieldOccupier(IPlayer occupier, IPlayer player) throws InvalidLineException, NotOccupiedException{
+		//TODO: not sure, if player reference works
+		if (occupier != null) {
+			// if no occupier and no player defined, set player as the occupier
+			if (player == null) {
+				player = occupier;
+			} else {
+				// if two different player have stones in the line, the line is invalid
+				if (player != occupier)
+					throw new InvalidLineException();
+			}
+		}
+		else
+			throw new NotOccupiedException();
+		return player;
+	}
+	
+	private class InvalidLineException extends Exception {
+		private static final long serialVersionUID = 3669759689830266773L;}
+	private class NotOccupiedException extends Exception{
+		private static final long serialVersionUID = 6092945789420077155L;}
 }
