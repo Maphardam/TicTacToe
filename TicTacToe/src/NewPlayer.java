@@ -4,8 +4,8 @@ import de.ovgu.dke.teaching.ml.tictactoe.api.IPlayer;
 import de.ovgu.dke.teaching.ml.tictactoe.api.IllegalMoveException;
 import de.ovgu.dke.teaching.ml.tictactoe.game.Move;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.Arrays;
 
 /**
  * Some comments ...
@@ -25,9 +25,9 @@ import java.util.List;
  */
 public class NewPlayer implements IPlayer {
 
-	private static final double ETA = 0.01;
+	private static final double ETA = 0.001;
 	private double[] weights = {0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1};
-	private final int FEATURE_NUMBER = weights.length;
+	private final int FEATURE_LENGTH = 8;
 	private boolean learning = true;
 
 	public String getName() {
@@ -54,6 +54,7 @@ public class NewPlayer implements IPlayer {
 	public void onMatchEnds(IBoard board) {
 		if (learning) {
 			updateWeights(board);
+			System.out.println(Arrays.toString(weights));
 		} else {
 
 		}
@@ -89,28 +90,31 @@ public class NewPlayer implements IPlayer {
 		return bestMove;
 	}
 
+	private double computeValue(int[] features){
+		double sum = 0;
+		for (int i = 0; i < FEATURE_LENGTH; i++) {
+			sum += features[i] * weights[i];
+		}
+		return sum;
+	}
 
 	private double computeValueAtPosition (IBoard _board, int x, int y, int z) {
 
 		IBoard board = _board.clone();
 
 		int[] currentFeatures = getFeatures(board);
-		double currentSum = 0;
-		for (int i = 0; i < FEATURE_NUMBER; i++) {
-			currentSum += currentFeatures[i] * weights[i];
-		}
+		double currentSum =computeValue(currentFeatures);
 
 		try {
 			board.makeMove(new Move(this, new int[] {x,y,z}));
-		} catch(IllegalMoveException e) {}
+		} catch(IllegalMoveException e) {
+			//return any negative value to ensure, that this move won't be choosen
+			return -101;
+		}
 
 		int[] futureFeatures = getFeatures(board);
-		double futureSum = 0;
-		for (int i = 0; i < FEATURE_NUMBER; i++) {
-			futureSum += futureFeatures[i] * weights[i];
-		}
-		System.out.println("cur " + Arrays.toString(currentFeatures));
-		System.out.println("fut " + Arrays.toString(futureFeatures));
+		double futureSum = computeValue(futureFeatures);
+		
 		return futureSum - currentSum;		
 	}
 
@@ -123,9 +127,9 @@ public class NewPlayer implements IPlayer {
 		int[] diagZLines = checkDiagZ(board);
 		int[] diag3DLines = check3D(board);
 
-		int[] features = new int[FEATURE_NUMBER];
+		int[] features = new int[FEATURE_LENGTH];
 
-		for (int i = 0; i < FEATURE_NUMBER; i++) {
+		for (int i = 0; i < FEATURE_LENGTH; i++) {
 			features[i] += xLines[i] + yLines[i] + zLines[i] + diagXLines[i]
 					+ diagYLines[i] + diagZLines[i] + diag3DLines[i];
 		}
@@ -133,7 +137,7 @@ public class NewPlayer implements IPlayer {
 	}
 
 	private int[] checkX(IBoard board) {
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 		int dimSize = board.getSize();
 		// Traverse board in horizontal x direction
 		for (int z = 0; z < dimSize; z++) {
@@ -164,7 +168,7 @@ public class NewPlayer implements IPlayer {
 	}
 
 	private int[] checkY(IBoard board) {
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 		int dimSize = board.getSize();
 
 		// Traverse board in horizontal y direction
@@ -197,7 +201,7 @@ public class NewPlayer implements IPlayer {
 	}
 
 	private int[] checkZ(IBoard board) {
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 		int dimSize = board.getSize();
 
 		// Traverse board in horizontal z direction
@@ -229,7 +233,7 @@ public class NewPlayer implements IPlayer {
 	}
 
 	private int[] checkDiagX(IBoard board) {
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 		int dimSize = board.getSize();
 
 		// Traverse board in diagonal x direction
@@ -282,7 +286,7 @@ public class NewPlayer implements IPlayer {
 	}
 
 	private int[] checkDiagY(IBoard board) {
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 		int dimSize = board.getSize();
 
 		// Traverse board in diagonal y direction
@@ -327,7 +331,7 @@ public class NewPlayer implements IPlayer {
 	}
 
 	private int[] checkDiagZ(IBoard board) {
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 		int dimSize = board.getSize();
 
 		// Traverse board in diagonal z direction
@@ -377,9 +381,9 @@ public class NewPlayer implements IPlayer {
 		int[] result2 = check3D_2(board);
 		int[] result3 = check3D_3(board);
 
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 
-		for (int i = 0; i < FEATURE_NUMBER; i++)
+		for (int i = 0; i < FEATURE_LENGTH; i++)
 			result[i] = result0[i] + result1[i] + result2[i] + result3[i];
 
 		return result;
@@ -389,7 +393,7 @@ public class NewPlayer implements IPlayer {
 		IPlayer player = null;
 		int count = 0;
 		int dimSize = board.getSize();
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 
 		for(int i = 0; i < dimSize; i++){
 
@@ -410,7 +414,7 @@ public class NewPlayer implements IPlayer {
 		IPlayer player = null;
 		int count = 0;
 		int dimSize = board.getSize();
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 
 		for(int i = 0; i < dimSize; i++){
 
@@ -431,7 +435,7 @@ public class NewPlayer implements IPlayer {
 		IPlayer player = null;
 		int count = 0;
 		int dimSize = board.getSize();
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 
 		for(int i = 0; i < dimSize; i++){
 
@@ -452,7 +456,7 @@ public class NewPlayer implements IPlayer {
 		IPlayer player = null;
 		int count = 0;
 		int dimSize = board.getSize();
-		int[] result = new int[FEATURE_NUMBER];
+		int[] result = new int[FEATURE_LENGTH];
 
 		for(int i = 0; i < dimSize; i++){
 
@@ -470,16 +474,71 @@ public class NewPlayer implements IPlayer {
 		return result;
 	}
 
+
 	private void updateWeights(IBoard board) {
 
+		IBoard boardCopy = board.clone();
+		
+		//get a list of all moves done
 		List<IMove> history = board.getMoveHistory();
+		
+		/*
+		 * for error computation, we need the learned V and
+		 * the V of our training example.
+		 * if we are in a final state, our vTrain will be
+		 * 0 (draw) or +100/-100.
+		 * As we go backward through the move list, this will happen
+		 * the first time. Otherwise we set vTrain(b) = learnedV(b-1)
+		 */ 
+		double learnedV = 0;
+		double vTrain = 0;
+		
+		IPlayer winner = board.getWinner();		
+		if (winner == null) {}
+		else if (winner == this)
+			vTrain = 100;
+		else
+			vTrain = -100;
+		System.out.println("first vTrain: " + vTrain);
+			
+		while (!history.isEmpty()){
+			System.out.println(history.size());
+			//we only want to consider our own moves
+			if (history.get(history.size()-1).getPlayer() != this) {
+				history.remove(history.size()-1);
+				if (history.isEmpty()) 
+					break;
+			}
+			boardCopy.clear();
+			IBoard reconstuctedBoard = reconstructFeatures(boardCopy, history);
+			int[] features = getFeatures(reconstuctedBoard);
+			System.out.println("features: " + Arrays.toString(features));
+			
+			learnedV = computeValue(features);
+			System.out.println("learnedV: " + learnedV);
+			
+			double error = vTrain - learnedV;
+			System.out.println("error: " + error);
+						
+			for (int i = 0; i < FEATURE_LENGTH; i++){
+				weights[i] = weights[i] + ETA * features[i] * error;
+			}
+			
+			vTrain = learnedV;
+			
+			history.remove(history.size()-1);
+		}
+	}
+	private IBoard reconstructFeatures(IBoard board, List<IMove> history) {
+		
+		IBoard copy = board.clone();
+		copy.clear();
 		for (IMove move : history) {
-			System.out.println(move.getPlayer() + "  " + move.getPosition());
-			//TODO
+			try {
+				copy.makeMove(move);
+			} catch (IllegalMoveException e) {}
 		}
-		for (int i = 0; i < weights.length; i++){
-			//weights[i] = weights[i] + eta * x * error;
-		}
+		return copy;
 	}
 
 	private int[] updateFeatureResult(IPlayer player, int[] result, int count) {
@@ -487,12 +546,12 @@ public class NewPlayer implements IPlayer {
 		if (count != 0) {
 			if (player == null){
 				result[count - 1]++;
-				result[count + (FEATURE_NUMBER/2-1)]++;
+				result[count + (FEATURE_LENGTH/2-1)]++;
 			}
 			else if (player == this)
 				result[count - 1]++;
 			else{
-				result[count + (FEATURE_NUMBER/2-1)]++;
+				result[count + (FEATURE_LENGTH/2-1)]++;
 			}
 		}
 		return result;
