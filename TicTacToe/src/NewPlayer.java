@@ -26,7 +26,7 @@ import java.util.Arrays;
 public class NewPlayer implements IPlayer {
 
 	private static final double ETA = 0.001;
-	private double[] weights = {0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1};
+	private double[] weights = {1,1,1,1,1,1,1,1};
 	private final int FEATURE_LENGTH = 8;
 	private boolean learning = true;
 
@@ -42,6 +42,7 @@ public class NewPlayer implements IPlayer {
 		int[] movePos = decideBestMove(copy);
 		// do a move using the cloned board
 		try {
+			//System.out.println(this + " " + Arrays.toString(movePos));
 			copy.makeMove(new Move(this, movePos));
 		} catch (IllegalMoveException e) {
 			// move was not allowed
@@ -76,8 +77,8 @@ public class NewPlayer implements IPlayer {
 
 					//if field is already used, we cant set a marker on it
 					if (board.getFieldValue(new int[] { x, y, z }) != null)
-						break;
-
+						continue;
+					
 					double value = computeValueAtPosition(board, x, y, z);
 					if (value > maxValue) {
 						maxValue = value;
@@ -499,10 +500,9 @@ public class NewPlayer implements IPlayer {
 			vTrain = 100;
 		else
 			vTrain = -100;
-		System.out.println("first vTrain: " + vTrain);
 			
 		while (!history.isEmpty()){
-			System.out.println(history.size());
+			//System.out.println(history.size());
 			//we only want to consider our own moves
 			if (history.get(history.size()-1).getPlayer() != this) {
 				history.remove(history.size()-1);
@@ -512,13 +512,14 @@ public class NewPlayer implements IPlayer {
 			boardCopy.clear();
 			IBoard reconstuctedBoard = reconstructFeatures(boardCopy, history);
 			int[] features = getFeatures(reconstuctedBoard);
-			System.out.println("features: " + Arrays.toString(features));
+			//System.out.println("features: " + Arrays.toString(features));
 			
 			learnedV = computeValue(features);
-			System.out.println("learnedV: " + learnedV);
 			
+			//System.out.println("learnedV: " + learnedV);
+			//System.out.println("vTrain: " + vTrain);
 			double error = vTrain - learnedV;
-			System.out.println("error: " + error);
+			//System.out.println("error: " + error);
 						
 			for (int i = 0; i < FEATURE_LENGTH; i++){
 				weights[i] = weights[i] + ETA * features[i] * error;
