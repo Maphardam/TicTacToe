@@ -16,16 +16,16 @@ import java.util.Arrays;
  * 
  * date: 11-03-2014
  */
-public class NewPlayer implements IPlayer {
+public class NewPlayer_fixed implements IPlayer {
 
 	// learning rate
 	private static final double ETA = 0.001;
 	// weights we will adjust after each game
-	private double[] weights = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	private double[] weights = { -6.395347043507386E14, 1.0671757852309615E15, 1.8230609581522325E14, -1.3025547013284633E13, -1.7649119549372612E12, -1.605493576472259E14, 6.001088371760246E14, -1.4780506625735106E14, 7.51876565253421E13, 1.0 };
 	// number of features we use
 	private final int FEATURE_LENGTH = 10;
 	// are we in a learning phase?
-	private boolean learning = true;
+	private boolean learning = false;
 
 	public String getName() {
 		return "EXTERMINATE!";

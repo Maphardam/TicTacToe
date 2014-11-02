@@ -1,0 +1,24 @@
+AUTOREN: Tilman Krokotsch, Tim Sabsch
+
+ANLEITUNG: Das Programm kann ebenso ausgeführt werden wie das ursprüngliche Template (vgl. TicTacToe/README.txt). Unser Player befindet sich unter TicTacToe/src/NewPlayer.java
+Der Player für die 2. Aufgabe (fixed weights) findet sich unter TicTacToe/src/NewPlayer_fixed.java
+
+KONZEPT: Unser Programm lässt sich in zwei Teile gliedern: Die Ermittlung des nächsten besten Zugs und das Erlernen der Gewichte.
+
+Zur Ermittlung des besten Zugs berechnen wir zunächst das aktuelle Ergebnis unserer gelernten Funktion V(x1,...,x10). Anschließend berechnen wir das Ergebnis der Funktion, wenn wir an einer Stelle [x,y,z] einen neuen Marker setzen würden. Dies tun wir für alle unbesetzten Stellen im Board. Die Stelle, die den größten Gewinn verspricht wird ausgewählt.
+
+Ist ein Spiel beendet, aktualisiert der Bot seine Gewichte. Dazu rekonstruiert er die Board-Zustände des Spiels und berechnet die dazugehörigen Feature-Werte, sowie den error. Der error ist definiert als vTrain - vLearned, wobei vLearned das Ergebnis unserer gelernten Funktion ist und vTrain(b)= vLearned(Successor(b)) bzw. -100/0/+100 im letzten Zug.
+
+Die Gewichte werden aktualisiert mit w_i = w_i + eta * x_i * error.
+
+Leider konnte unsere Implementation diesen Algorithmus nicht korrekt umsetzen. Nach einem 50-ründigen Turnier gegen den RandomPlayer hat unser Programm folgende Gewichte erlernt:
+[-6.395347043507386E14, 1.0671757852309615E15, 1.8230609581522325E14, -1.3025547013284633E13, -1.7649119549372612E12, -1.605493576472259E14, 6.001088371760246E14, -1.4780506625735106E14, 7.51876565253421E13, 1.0]
+
+Dies entspricht in keiner Weise unseren erhofften Werten. Beispiel-Werte für einen erfolgreich abgeschlossenen Lernprozess wären [1, 2, 3, 4, 5, -1, -2, -3, -4, -5].
+Daher kann unser Player auch in Aufgabe 1.4 nicht mithalten, sondern ist sogar schlechter als RandomPlayer. Wir können uns derzeit aber nicht erschließen, wo unser Fehler liegt.
+
+Der Lernprozess ist auch im beiliegenden Diagramm dargestellt.
+
+
+
+
